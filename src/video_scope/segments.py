@@ -18,7 +18,10 @@ from video_scope.media import MediaInfo, probe
 
 _FULL_INLINE_BYTES = 12 * 1024 * 1024
 _MAX_DENSE_FRAMES = 24
-_MAX_SHOT_CUTS = 8
+_MAX_SHOT_CANDIDATES = 24
+_MAX_BOUNDARY_FRAME_CUTS = 8
+_MIN_SHOT_CUT_SEPARATION = 0.25
+_MIN_SHOT_CUT_SCORE = 0.11
 _PROTOCOLS = "file,pipe"
 
 
@@ -285,6 +288,17 @@ def _dense_times(frame_times: list[float], end: float) -> list[float]:
     return sorted(selected)
 
 
+def _select_shot_cuts(scored: list[tuple[float, float]]) -> list[tuple[float, float]]:
+    """Keep the strongest separated cut candidates without a fast-cut eight-shot ceiling."""
+    selected: list[tuple[float, float]] = []
+    for time, score in sorted(scored, key=lambda item: (-item[1], item[0])):
+        if all(abs(time - existing) >= _MIN_SHOT_CUT_SEPARATION for existing, _ in selected):
+            selected.append((time, score))
+            if len(selected) == _MAX_SHOT_CANDIDATES:
+                break
+    return sorted(selected)
+
+
 def _shot_candidates(
     source: Path, frame_times: list[float], observed_end: float
 ) -> tuple[list[dict[str, Any]], list[float]]:
@@ -339,7 +353,7 @@ def _shot_candidates(
                 if previous is not None:
                     channels = cv2.mean(cv2.absdiff(frame, previous))[:3]
                     score = float(sum(channels)) / (3 * 255.0)
-                    if score >= 0.18:
+                    if score >= _MIN_SHOT_CUT_SCORE:
                         scored.append((time, min(1.0, score)))
                 previous = frame
                 decoded += 1
@@ -353,11 +367,7 @@ def _shot_candidates(
     except OSError as exc:
         raise RuntimeError("unable to run ffmpeg for shot candidate detection") from exc
 
-    strongest = sorted(scored, key=lambda item: (-item[1], item[0]))[:_MAX_SHOT_CUTS]
-    cuts: list[tuple[float, float]] = []
-    for time, score in sorted(strongest):
-        if not cuts or time - cuts[-1][0] >= 0.25:
-            cuts.append((time, score))
+    cuts = _select_shot_cuts(scored)
     score_by_cut = {time: score for time, score in cuts}
     boundaries = [0.0, *(time for time, _ in cuts), observed_end]
     intervals = [
@@ -370,7 +380,8 @@ def _shot_candidates(
         if boundaries[index + 1] > boundaries[index]
     ]
     boundary_frames: set[float] = set()
-    for time, _ in cuts:
+    frame_cuts = sorted(cuts, key=lambda item: (-item[1], item[0]))[:_MAX_BOUNDARY_FRAME_CUTS]
+    for time, _ in frame_cuts:
         right = bisect.bisect_left(frame_times, time)
         if right:
             candidate = frame_times[right - 1]

@@ -14,7 +14,13 @@ import pytest
 from test_results import _full_payload, _opening_payload
 
 import video_scope.analysis as analysis_module
-from video_scope.analysis import _canonical_ids, _scope_check, analyze_sample, section_schema
+from video_scope.analysis import (
+    _base_prompt,
+    _canonical_ids,
+    _scope_check,
+    analyze_sample,
+    section_schema,
+)
 from video_scope.analysis_store import AnalysisStore, atomic_json
 from video_scope.evidence import digest
 from video_scope.export import export_result, validate_package
@@ -37,6 +43,24 @@ def _schema_refs(value: Any) -> set[str]:
         for child in value:
             refs.update(_schema_refs(child))
     return refs
+
+
+def test_prompt_requires_jump_cut_orientation_claim_and_timing_discipline() -> None:
+    prompt = _base_prompt(
+        "full",
+        "a" * 64,
+        5.0,
+        {
+            "observed_intervals": [{"start": 0.0, "end": 5.0}],
+            "av_sync": {"status": "measured", "audio_start_offset": 0.0},
+            "shot_candidates": [{"start": 0.0, "end": 5.0, "confidence": 0.0}],
+        },
+    )
+
+    assert "硬切/跳切后的新镜头" in prompt
+    assert "手心/手背" in prompt
+    assert "口播声称" in prompt
+    assert "区间外的后续语句" in prompt
 
 
 def test_section_schema_keeps_only_transitive_subset_references() -> None:

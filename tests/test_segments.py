@@ -9,11 +9,28 @@ import pytest
 
 from video_scope.evidence import EvidenceManifest, digest, write_manifest
 from video_scope.media import prepare, probe
-from video_scope.segments import extract_clip, extract_frames, prepare_analysis_media
+from video_scope.segments import (
+    _select_shot_cuts,
+    extract_clip,
+    extract_frames,
+    prepare_analysis_media,
+)
 
 
 def _run(*command: str) -> None:
     subprocess.run(command, check=True, capture_output=True, text=True)
+
+
+def test_shot_candidate_selection_supports_fast_cut_video_and_suppresses_clusters() -> None:
+    distinct = [(float(index), 0.2 + index / 1000) for index in range(30)]
+
+    selected = _select_shot_cuts([*distinct, (10.1, 0.99)])
+
+    assert len(selected) == 24
+    assert len(selected) > 8
+    assert selected == sorted(selected)
+    assert (10.1, 0.99) in selected
+    assert all(time != 10.0 for time, _ in selected)
 
 
 @pytest.fixture

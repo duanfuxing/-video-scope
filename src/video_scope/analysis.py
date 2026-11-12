@@ -18,7 +18,7 @@ from video_scope.provider import Pricing, ProviderConfig, generate
 from video_scope.segments import extract_frames, prepare_analysis_media
 from video_scope.validation import result_type, validate_result
 
-PROMPT_VERSION = "four-example-analysis-1.0"
+PROMPT_VERSION = "video-analysis-1.1"
 CONTRACT_VERSION = "1.0.0"
 
 _FIELDS = {
@@ -86,7 +86,11 @@ def _base_prompt(mode: str, source_hash: str, duration: float, media: dict[str, 
 完整开场可以短于或长于3秒，结束未知填null并注明；已确认结束时后文承接.开场结束状态不可为null且时间一致。
 本地切镜候选如下（不是已核实切点，闪光/包装也可能触发，需要你核对）：
 {json.dumps(media["shot_candidates"], ensure_ascii=False)}
+逐一核对候选及动态视频中的其他瞬时不连续处。同一人物、场景或构图只要跨帧发生姿态、取景或状态跳变，仍是硬切/跳切后的新镜头；禁止因主体相同而合并多个拍摄段。候选若确认不是切点才可合并。
+手心/手背、左右方向及身体部位必须以画面为准；无法确认时使用中性描述并列入不确定项，不能猜测。
 区分主体动作与相机运动、口播对白与画面文字、原片功效主张与真实产品事实、观察与迁移建议。
+原片对效果、适用肤色或产品能力的表达只能写成“口播声称”“画面呈现”或“原片主张”，不得写成已经证实、有效或真实功效。
+口播开始与结束时间必须覆盖所写整句，并联合音轨和可见字幕核对；不得把区间外的后续语句压入过短时间。动态字幕应记录可见原文及变化范围，不能只用“跟随口播显示”替代已观察文字。
 只把动态视频及音轨支持的内容当动态/声音观察，不能用截图推断动作声音。不要猜器材、版权、效果指标。
 没有观察到或无法确认的文字描述用null并列入不确定项；不得使用空字符串、0、false冒充未知。
 列表[]仅限实际已核对不存在或不适用；未核对必须在不确定项写清影响和补证需求。
@@ -246,8 +250,7 @@ def _canonical_ids(payload: dict[str, Any]) -> dict[str, Any]:
                 if "标识" in key and key != "来源视频标识":
                     if key == "涉及的模块或记录标识" and isinstance(item, str):
                         node[key] = "".join(
-                            mapping.get(part, part)
-                            for part in re.split(r"([.\[\]/\s,，、])", item)
+                            mapping.get(part, part) for part in re.split(r"([.\[\]/\s,，、])", item)
                         )
                     elif isinstance(item, str) and item in mapping:
                         node[key] = mapping[item]
@@ -373,7 +376,7 @@ def analyze_sample(
                 "endpoint": config.endpoint,
                 "prompt": PROMPT_VERSION,
                 "contract": CONTRACT_VERSION,
-                "media": "segments-1.0",
+                "media": "segments-1.1",
             },
             sort_keys=True,
         ).encode()
