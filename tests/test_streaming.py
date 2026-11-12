@@ -50,10 +50,10 @@ def text_chunk(text: str, *, output_tokens: int | None = None) -> dict[str, Any]
     return result
 
 
-def terminal(*, usage: bool = True) -> dict[str, Any]:
+def terminal(*, usage: bool = True, model_version: str = MODEL) -> dict[str, Any]:
     result: dict[str, Any] = {
         "candidates": [{"finishReason": "STOP"}],
-        "modelVersion": MODEL,
+        "modelVersion": model_version,
         "responseId": "stream-response",
     }
     if usage:
@@ -185,6 +185,8 @@ def test_streaming_success_is_durable_before_final_envelope_and_replayed(
     assert result["usage"]["total_token_count"] == 106
     assert result["estimated_usd"] == "0.00009750"
     assert result["streaming"] is True
+    assert result["stream_protocol_complete"] is True
+    assert result["reported_model_versions"] == [MODEL]
     assert result["chunk_count"] == 3
     assert len(records(stream_path)) == 3
     assert json.loads(response_path.read_text(encoding="utf-8")) == result
@@ -217,6 +219,28 @@ def test_terminal_metadata_only_part_is_accepted(ledger: AnalysisStore) -> None:
     assert result["finish_reason"] == "STOP"
 
 
+def test_terminal_can_refine_internal_model_version_for_same_response(
+    ledger: AnalysisStore,
+) -> None:
+    call = reserve(ledger)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return stream_response(
+            ScriptedStream(
+                [
+                    event(text_chunk('{"ok":true}', output_tokens=4)),
+                    event(terminal(model_version="internal-concrete-version")),
+                ]
+            )
+        )
+
+    result = generate(**arguments(ledger, call, httpx.MockTransport(handler)))
+
+    assert result["model"] == MODEL
+    assert result["model_version"] == "internal-concrete-version"
+    assert result["reported_model_versions"] == [MODEL, "internal-concrete-version"]
+
+
 def test_complete_unknown_stream_journal_is_recovered_without_network(
     ledger: AnalysisStore,
 ) -> None:
@@ -247,7 +271,7 @@ def test_complete_unknown_stream_journal_is_recovered_without_network(
                 "total_token_count": 104,
             },
             "response_id": "saved-response",
-            "model_version": MODEL,
+            "model_version": "internal-concrete-version",
         },
     ]
     stream_path.write_text(
@@ -267,6 +291,9 @@ def test_complete_unknown_stream_journal_is_recovered_without_network(
     assert result["finish_reason"] == "STOP"
     assert result["recovered_from_stream"] is True
     assert result["chunk_count"] == 2
+    assert result["model"] == MODEL
+    assert result["model_version"] == "internal-concrete-version"
+    assert result["reported_model_versions"] == [MODEL, "internal-concrete-version"]
     saved = ledger.find_call(call["analysis_id"], call["stage"])
     assert saved is not None
     assert saved["state"] == "succeeded"
@@ -338,7 +365,9 @@ def test_midstream_timeout_preserves_received_chunks(ledger: AnalysisStore) -> N
     assert_unknown(ledger, call)
 
 
-def test_timeout_after_stop_and_usage_is_not_success(ledger: AnalysisStore) -> None:
+def test_timeout_after_stop_and_usage_does_not_invalidate_protocol_completion(
+    ledger: AnalysisStore,
+) -> None:
     call = reserve(ledger)
     response_path, stream_path, _ = paths(ledger, call)
 
@@ -350,12 +379,38 @@ def test_timeout_after_stop_and_usage_is_not_success(ledger: AnalysisStore) -> N
             )
         )
 
-    with pytest.raises(RuntimeError, match="never blindly resend"):
-        generate(**arguments(ledger, call, httpx.MockTransport(handler)))
+    result = generate(**arguments(ledger, call, httpx.MockTransport(handler)))
 
-    assert not response_path.exists()
+    assert response_path.exists()
     assert len(records(stream_path)) == 2
-    assert_unknown(ledger, call)
+    assert result["text"] == "complete"
+    assert result["finish_reason"] == "STOP"
+    assert result["stream_protocol_complete"] is True
+    saved = ledger.find_call(call["analysis_id"], call["stage"])
+    assert saved is not None
+    assert saved["state"] == "succeeded"
+
+
+def test_chunks_after_terminal_and_usage_are_not_consumed(ledger: AnalysisStore) -> None:
+    call = reserve(ledger)
+    _, stream_path, _ = paths(ledger, call)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return stream_response(
+            ScriptedStream(
+                [
+                    event(text_chunk("complete", output_tokens=6)),
+                    event(terminal()),
+                    event(text_chunk("late duplicate", output_tokens=2)),
+                ]
+            )
+        )
+
+    result = generate(**arguments(ledger, call, httpx.MockTransport(handler)))
+
+    assert result["text"] == "complete"
+    assert result["chunk_count"] == 2
+    assert len(records(stream_path)) == 2
 
 
 @pytest.mark.parametrize(

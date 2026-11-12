@@ -38,6 +38,8 @@ def recover_stream(
     final_usage: types.GenerateContentResponseUsageMetadata | None = None
     response_id: str | None = None
     model_version: str | None = None
+    model_version_refined = False
+    reported_model_versions: list[str] = []
     elapsed_seconds: float | int = 0
     for index, line in enumerate(lines):
         try:
@@ -54,17 +56,18 @@ def recover_stream(
         text.append(delta)
 
         current_finish = record.get("finish_reason")
+        parsed_current_finish: types.FinishReason | None = None
         if current_finish is not None:
             if not isinstance(current_finish, str):
                 raise ValueError("saved stream journal has an invalid finish reason")
             try:
-                parsed_finish = types.FinishReason(current_finish)
+                parsed_current_finish = types.FinishReason(current_finish)
             except ValueError as exc:
                 raise ValueError("saved stream journal has an unknown finish reason") from exc
-            if parsed_finish != types.FinishReason.FINISH_REASON_UNSPECIFIED:
-                if finish is not None and finish != parsed_finish:
+            if parsed_current_finish != types.FinishReason.FINISH_REASON_UNSPECIFIED:
+                if finish is not None and finish != parsed_current_finish:
                     raise ValueError("saved stream journal has conflicting finish reasons")
-                finish = parsed_finish
+                finish = parsed_current_finish
 
         usage = record.get("usage")
         if finish is not None and usage is not None:
@@ -72,17 +75,38 @@ def recover_stream(
                 raise ValueError("saved stream journal has invalid final usage")
             final_usage = types.GenerateContentResponseUsageMetadata.model_validate(usage)
 
-        for field, previous in (
-            ("response_id", response_id),
-            ("model_version", model_version),
+        current_response_id = record.get("response_id")
+        if current_response_id is not None and not isinstance(current_response_id, str):
+            raise ValueError("saved stream journal has invalid response_id")
+        if (
+            response_id is not None
+            and current_response_id is not None
+            and response_id != current_response_id
         ):
-            current = record.get(field)
-            if current is not None and not isinstance(current, str):
-                raise ValueError(f"saved stream journal has invalid {field}")
-            if previous is not None and current is not None and previous != current:
-                raise ValueError(f"saved stream journal changed {field}")
-        response_id = record.get("response_id") or response_id
-        model_version = record.get("model_version") or model_version
+            raise ValueError("saved stream journal changed response_id")
+        response_id = current_response_id or response_id
+
+        current_model_version = record.get("model_version")
+        if current_model_version is not None and not isinstance(current_model_version, str):
+            raise ValueError("saved stream journal has invalid model_version")
+        if (
+            current_model_version is not None
+            and current_model_version not in reported_model_versions
+        ):
+            reported_model_versions.append(current_model_version)
+        if (
+            model_version is not None
+            and current_model_version is not None
+            and model_version != current_model_version
+        ):
+            if (
+                model_version_refined
+                or parsed_current_finish in {None, types.FinishReason.FINISH_REASON_UNSPECIFIED}
+                or usage is None
+            ):
+                raise ValueError("saved stream journal changed model_version before termination")
+            model_version_refined = True
+        model_version = current_model_version or model_version
         current_elapsed = record.get("elapsed_seconds", elapsed_seconds)
         if isinstance(current_elapsed, bool) or not isinstance(current_elapsed, (int, float)):
             raise ValueError("saved stream journal has invalid elapsed time")
@@ -96,6 +120,8 @@ def recover_stream(
         "chunk_count": len(lines),
         "characters": sum(len(item) for item in text),
         "terminal_received": True,
+        "protocol_complete": True,
+        "reported_model_versions": reported_model_versions,
         "elapsed_seconds": elapsed_seconds,
         "recovered": True,
     }
@@ -129,8 +155,16 @@ def collect_stream(
     final_usage: types.GenerateContentResponseUsageMetadata | None = None
     response_id: str | None = None
     model_version: str | None = None
+    model_version_refined = False
+    reported_model_versions: list[str] = []
     total_bytes = 0
-    progress.update(chunk_count=0, characters=0, terminal_received=False)
+    progress.update(
+        chunk_count=0,
+        characters=0,
+        terminal_received=False,
+        protocol_complete=False,
+        reported_model_versions=reported_model_versions,
+    )
     print(f"流式请求 {call_id}：等待首个分块（空闲读取上限 300 秒）", file=sys.stderr, flush=True)
     descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(descriptor, "w", encoding="utf-8") as journal:
@@ -142,6 +176,29 @@ def collect_stream(
             parts = candidate.content.parts if candidate and candidate.content else []
             delta = "".join(part.text or "" for part in parts or [] if not part.thought)
             current_finish = candidate.finish_reason if candidate else None
+            if (
+                response_id is not None
+                and chunk.response_id is not None
+                and response_id != chunk.response_id
+            ):
+                raise ValueError("stream changed response_id before its terminal event")
+            if (
+                chunk.model_version is not None
+                and chunk.model_version not in reported_model_versions
+            ):
+                reported_model_versions.append(chunk.model_version)
+            if (
+                model_version is not None
+                and chunk.model_version is not None
+                and model_version != chunk.model_version
+            ):
+                if (
+                    model_version_refined
+                    or current_finish in {None, types.FinishReason.FINISH_REASON_UNSPECIFIED}
+                    or chunk.usage_metadata is None
+                ):
+                    raise ValueError("stream changed model_version before its terminal event")
+                model_version_refined = True
             response_id = chunk.response_id or response_id
             model_version = chunk.model_version or model_version
             record = {
@@ -186,6 +243,12 @@ def collect_stream(
             # Usage is cumulative, not a per-chunk delta; require it at/after the terminal event.
             if finish is not None and chunk.usage_metadata is not None:
                 final_usage = chunk.usage_metadata
+            # Gemini defines finishReason as the reason token generation stopped. Once the
+            # same response has both a terminal reason and complete usage, close the SSE
+            # iterator instead of waiting for a supplier proxy to close the HTTP body.
+            if finish is not None and final_usage is not None:
+                progress["protocol_complete"] = True
+                break
     if finish is None:
         raise ValueError("stream ended without a terminal finish reason")
     if final_usage is None:

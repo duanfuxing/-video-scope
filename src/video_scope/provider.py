@@ -297,6 +297,8 @@ def generate(
             "received_at": datetime.now(UTC).isoformat(),
             "streaming": True,
             "chunk_count": recovered_progress["chunk_count"],
+            "stream_protocol_complete": recovered_progress["protocol_complete"],
+            "reported_model_versions": recovered_progress["reported_model_versions"],
             "recovered_from_stream": True,
         }
         atomic_json(response_path, recovered_envelope)
@@ -381,6 +383,7 @@ def generate(
                     max_output_tokens=MAX_OUTPUT_TOKENS,
                     thinking_config=types.ThinkingConfig(thinking_budget=0),
                     automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
+                    automatic_continuation=False,
                 )
                 contents = types.Content(role="user", parts=parts)
                 if config.streaming:
@@ -428,6 +431,8 @@ def generate(
             "received_at": datetime.now(UTC).isoformat(),
             "streaming": config.streaming,
             "chunk_count": stream_progress.get("chunk_count", 0),
+            "stream_protocol_complete": stream_progress.get("protocol_complete", False),
+            "reported_model_versions": stream_progress.get("reported_model_versions", []),
         }
         atomic_json(response_path, envelope)
         usage, cost = usage_cost(response, pricing)
