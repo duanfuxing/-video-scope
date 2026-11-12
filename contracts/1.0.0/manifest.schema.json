@@ -1,0 +1,141 @@
+{
+  "$defs": {
+    "PackageFile": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "result",
+            "source",
+            "frame"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "size": {
+          "exclusiveMinimum": 0,
+          "title": "Size",
+          "type": "integer"
+        },
+        "source_time": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Time"
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "size",
+        "kind"
+      ],
+      "title": "PackageFile",
+      "type": "object"
+    }
+  },
+  "$id": "https://video-scope.local/contracts/1.0.0/manifest.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "analysis_id": {
+      "minLength": 1,
+      "title": "Analysis Id",
+      "type": "string"
+    },
+    "call_ids": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "title": "Call Ids",
+      "type": "array"
+    },
+    "duration": {
+      "exclusiveMinimum": 0,
+      "title": "Duration",
+      "type": "number"
+    },
+    "files": {
+      "items": {
+        "$ref": "#/$defs/PackageFile"
+      },
+      "minItems": 3,
+      "title": "Files",
+      "type": "array"
+    },
+    "format_version": {
+      "const": "1.0.0",
+      "default": "1.0.0",
+      "title": "Format Version",
+      "type": "string"
+    },
+    "mode": {
+      "enum": [
+        "full",
+        "opening"
+      ],
+      "title": "Mode",
+      "type": "string"
+    },
+    "model": {
+      "minLength": 1,
+      "title": "Model",
+      "type": "string"
+    },
+    "provider": {
+      "minLength": 1,
+      "title": "Provider",
+      "type": "string"
+    },
+    "review_status": {
+      "const": "human_pending",
+      "default": "human_pending",
+      "title": "Review Status",
+      "type": "string"
+    },
+    "source_id": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Source Id",
+      "type": "string"
+    },
+    "warnings": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "source_id",
+    "analysis_id",
+    "mode",
+    "model",
+    "provider",
+    "call_ids",
+    "duration",
+    "files",
+    "warnings"
+  ],
+  "title": "PackageManifest",
+  "type": "object"
+}

@@ -101,7 +101,13 @@ def test_symlink_rejected(video: Path, tmp_path: Path) -> None:
         validate_evidence(evidence)
 
 
-def test_batch_isolates_bad_rows(video: Path, tmp_path: Path) -> None:
+def test_batch_isolates_bad_rows(
+    video: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "video_scope.cli.sync_sources",
+        lambda *args, **kwargs: {"status": "test", "commit": "a" * 40, "snapshot": "fixture"},
+    )
     batch = tmp_path / "batch.jsonl"
     batch.write_text("not json\n" + json.dumps({"source": video.name}) + "\n")
     entries = read_batch(batch)

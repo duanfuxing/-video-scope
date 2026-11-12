@@ -1,0 +1,2197 @@
+{
+  "$defs": {
+    "Action": {
+      "additionalProperties": false,
+      "properties": {
+        "作用对象标识": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z][A-Za-z0-9_.:-]*$",
+            "type": "string"
+          },
+          "title": "作用对象标识",
+          "type": "array"
+        },
+        "动作与状态变化": {
+          "minLength": 1,
+          "title": "动作与状态变化",
+          "type": "string"
+        },
+        "动作标识": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z][A-Za-z0-9_.:-]*$",
+          "title": "动作标识",
+          "type": "string"
+        },
+        "开始秒": {
+          "minimum": 0,
+          "title": "开始秒",
+          "type": "number"
+        },
+        "执行实体标识": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z][A-Za-z0-9_.:-]*$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "执行实体标识",
+          "type": "array"
+        },
+        "结束秒": {
+          "minimum": 0,
+          "title": "结束秒",
+          "type": "number"
+        }
+      },
+      "required": [
+        "开始秒",
+        "结束秒",
+        "动作标识",
+        "执行实体标识",
+        "作用对象标识",
+        "动作与状态变化"
+      ],
+      "title": "Action",
+      "type": "object"
+    },
+    "ActionProcess": {
+      "additionalProperties": false,
+      "properties": {
+        "动作节点": {
+          "items": {
+            "$ref": "#/$defs/Action"
+          },
+          "title": "动作节点",
+          "type": "array"
+        },
+        "结束状态": {
+          "items": {
+            "$ref": "#/$defs/EntityState"
+          },
+          "title": "结束状态",
+          "type": "array"
+        },
+        "起始状态": {
+          "items": {
+            "$ref": "#/$defs/EntityState"
+          },
+          "title": "起始状态",
+          "type": "array"
+        }
+      },
+      "required": [
+        "起始状态",
+        "动作节点",
+        "结束状态"
+      ],
+      "title": "ActionProcess",
+      "type": "object"
+    },
+    "ActualFirstThreeSeconds": {
+      "additionalProperties": false,
+      "properties": {
+        "开始秒": {
+          "minimum": 0,
+          "title": "开始秒",
+          "type": "number"
+        },
+        "结束秒": {
+          "minimum": 0,
+          "title": "结束秒",
+          "type": "number"
+        }
+      },
+      "required": [
+        "开始秒",
+        "结束秒"
+      ],
+      "title": "ActualFirstThreeSeconds",
+      "type": "object"
+    },
+    "AttractionMechanism": {
+      "additionalProperties": false,
+      "properties": {
+        "关联视听记录标识": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z][A-Za-z0-9_.:-]*$",
+            "type": "string"
+          },
+          "title": "关联视听记录标识",
+          "type": "array"
+        },
+        "关联镜头标识": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z][A-Za-z0-9_.:-]*$",
+            "type": "string"
+          },
+          "title": "关联镜头标识",
+          "type": "array"
+        },
+        "完整开场如何成立": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "完整开场如何成立"
+        },
+        "实际前三秒表现": {
+          "minLength": 1,
+          "title": "实际前三秒表现",
+          "type": "string"
+        },
+        "建立的观看期待": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "建立的观看期待"
+        },
+        "第一眼吸引点": {
+          "minLength": 1,
+          "title": "第一眼吸引点",
+          "type": "string"
+        },
+        "视听配合方式": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "视听配合方式"
+        }
+      },
+      "required": [
+        "实际前三秒表现",
+        "完整开场如何成立",
+        "第一眼吸引点",
+        "建立的观看期待",
+        "视听配合方式",
+        "关联镜头标识",
+        "关联视听记录标识"
+      ],
+      "title": "AttractionMechanism",
+      "type": "object"
+    },
+    "AudiovisualTimeline": {
+      "additionalProperties": false,
+      "properties": {
+        "口播对白轨": {
+          "items": {
+            "$ref": "#/$defs/Speech"
+          },
+          "title": "口播对白轨",
+          "type": "array"
+        },
+        "声音轨": {
+          "items": {
+            "$ref": "#/$defs/Sound"
+          },
+          "title": "声音轨",
+          "type": "array"
+        },
+        "文字与包装轨": {
+          "items": {
+            "$ref": "#/$defs/Overlay"
+          },
+          "title": "文字与包装轨",
+          "type": "array"
+        },
+        "视听同步点": {
+          "items": {
+            "$ref": "#/$defs/SyncPoint"
+          },
+          "title": "视听同步点",
+          "type": "array"
+        }
+      },
+      "required": [
+        "口播对白轨",
+        "声音轨",
+        "文字与包装轨",
+        "视听同步点"
+      ],
+      "title": "AudiovisualTimeline",
+      "type": "object"
+    },
+    "CameraMovement": {
+      "additionalProperties": false,
+      "properties": {
+        "开始秒": {
+          "minimum": 0,
+          "title": "开始秒",
+          "type": "number"
+        },
+        "结束秒": {
+          "minimum": 0,
+          "title": "结束秒",
+          "type": "number"
+        },
+        "运动表现": {
+          "minLength": 1,
+          "title": "运动表现",
+          "type": "string"
+        },
+        "速度变化与停顿": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "速度变化与停顿"
+        }
+      },
+      "required": [
+        "开始秒",
+        "结束秒",
+        "运动表现",
+        "速度变化与停顿"
+      ],
+      "title": "CameraMovement",
+      "type": "object"
+    },
+    "Character": {
+      "additionalProperties": false,
+      "properties": {
+        "人物标识": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z][A-Za-z0-9_.:-]*$",
+          "title": "人物标识",
+          "type": "string"
+        },
+        "内容作用": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "内容作用"
+        },
+        "可见特征": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "可见特征"
+        },
+        "称呼": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "称呼"
+        }
+      },
+      "required": [
+        "人物标识",
+        "称呼",
+        "可见特征",
+        "内容作用"
+      ],
+      "title": "Character",
+      "type": "object"
+    },
+    "CompleteOpening": {
+      "additionalProperties": false,
+      "properties": {
+        "开始秒": {
+          "minimum": 0,
+          "title": "开始秒",
+          "type": "number"
+        },
+        "结束依据": {
+          "minLength": 1,
+          "title": "结束依据",
+          "type": "string"
+        },
+        "结束秒": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "结束秒"
+        }
+      },
+      "required": [
+        "开始秒",
+        "结束秒",
+        "结束依据"
+      ],
+      "title": "CompleteOpening",
+      "type": "object"
+    },
+    "DynamicEvidence": {
+      "additionalProperties": false,
+      "properties": {
+        "开始秒": {
+          "minimum": 0,
+          "title": "开始秒",
+          "type": "number"
+        },
+        "核对内容": {
+          "minLength": 1,
+          "title": "核对内容",
+          "type": "string"
+        },
+        "结束秒": {
+          "minimum": 0,
+          "title": "结束秒",
+          "type": "number"
+        }
+      },
+      "required": [
+        "开始秒",
+        "结束秒",
+        "核对内容"
+      ],
+      "title": "DynamicEvidence",
+      "type": "object"
+    },
+    "Entities": {
+      "additionalProperties": false,
+      "properties": {
+        "产品与道具": {
+          "items": {
+            "$ref": "#/$defs/ProductObject"
+          },
+          "title": "产品与道具",
+          "type": "array"
+        },
+        "人物": {
+          "items": {
+            "$ref": "#/$defs/Character"
+          },
+          "title": "人物",
+          "type": "array"
+        },
+        "关键关系": {
+          "items": {
+            "$ref": "#/$defs/EntityRelationship"
+          },
+          "title": "关键关系",
+          "type": "array"
+        },
+        "场景": {
+          "items": {
+            "$ref": "#/$defs/Scene"
+          },
+          "title": "场景",
+          "type": "array"
+        }
+      },
+      "required": [
+        "人物",
+        "场景",
+        "产品与道具",
+        "关键关系"
+      ],
+      "title": "Entities",
+      "type": "object"
+    },
+    "EntityRelationship": {
+      "additionalProperties": false,
+      "properties": {
+        "关系说明": {
+          "minLength": 1,
+          "title": "关系说明",
+          "type": "string"
+        },
+        "关联实体标识": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z][A-Za-z0-9_.:-]*$",
+            "type": "string"
+          },
+          "minItems": 2,
+          "title": "关联实体标识",
+          "type": "array"
+        }
+      },
+      "required": [
+        "关联实体标识",
+        "关系说明"
+      ],
+      "title": "EntityRelationship",
+      "type": "object"
+    },
+    "EntityState": {
+      "additionalProperties": false,
+      "properties": {
+        "实体标识": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z][A-Za-z0-9_.:-]*$",
+          "title": "实体标识",
+          "type": "string"
+        },
+        "持有或接触的实体标识": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z][A-Za-z0-9_.:-]*$",
+            "type": "string"
+          },
+          "title": "持有或接触的实体标识",
+          "type": "array"
+        },
+        "朝向姿态与可见状态": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "朝向姿态与可见状态"
+        },
+        "画面位置": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "画面位置"
+        }
+      },
+      "required": [
+        "实体标识",
+        "画面位置",
+        "朝向姿态与可见状态",
+        "持有或接触的实体标识"
+      ],
+      "title": "EntityState",
+      "type": "object"
+    },
+    "FollowUp": {
+      "additionalProperties": false,
+      "properties": {
+        "与产品买点的关系": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "与产品买点的关系"
+        },
+        "与紧接后文的衔接": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "与紧接后文的衔接"
+        },
+        "开场结束状态": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OpeningEndState"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "承接说明": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "承接说明"
+        },
+        "核对状态": {
+          "enum": [
+            "已核对有承接",
+            "已核对无承接",
+            "未核对"
+          ],
+          "title": "核对状态",
+          "type": "string"
+        },
+        "证据片段": {
+          "items": {
+            "$ref": "#/$defs/FollowUpEvidence"
+          },
+          "title": "证据片段",
+          "type": "array"
+        }
+      },
+      "required": [
+        "核对状态",
+        "开场结束状态",
+        "与紧接后文的衔接",
+        "承接说明",
+        "与产品买点的关系",
+        "证据片段"
+      ],
+      "title": "FollowUp",
+      "type": "object"
+    },
+    "FollowUpEvidence": {
+      "additionalProperties": false,
+      "properties": {
+        "关键帧": {
+          "items": {
+            "$ref": "#/$defs/KeyFrame"
+          },
+          "title": "关键帧",
+          "type": "array"
+        },
+        "实际内容": {
+          "minLength": 1,
+          "title": "实际内容",
+          "type": "string"
+        },
+        "开始秒": {
+          "minimum": 0,
+          "title": "开始秒",
+          "type": "number"
+        },
+        "结束秒": {
+          "minimum": 0,
+          "title": "结束秒",
+          "type": "number"
+        }
+      },
+      "required": [
+        "开始秒",
+        "结束秒",
+        "实际内容",
+        "关键帧"
+      ],
+      "title": "FollowUpEvidence",
+      "type": "object"
+    },
+    "KeyFrame": {
+      "additionalProperties": false,
+      "properties": {
+        "原片时间秒": {
+          "minimum": 0,
+          "title": "原片时间秒",
+          "type": "number"
+        },
+        "含后期文字或贴片": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "含后期文字或贴片"
+        },
+        "媒体引用": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MediaReference"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "用途": {
+          "minLength": 1,
+          "title": "用途",
+          "type": "string"
+        }
+      },
+      "required": [
+        "原片时间秒",
+        "用途",
+        "媒体引用",
+        "含后期文字或贴片"
+      ],
+      "title": "KeyFrame",
+      "type": "object"
+    },
+    "LightColorMaterial": {
+      "additionalProperties": false,
+      "properties": {
+        "主要光线与阴影": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "主要光线与阴影"
+        },
+        "影调与色彩": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "影调与色彩"
+        },
+        "材质与关键细节": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "材质与关键细节"
+        }
+      },
+      "required": [
+        "主要光线与阴影",
+        "影调与色彩",
+        "材质与关键细节"
+      ],
+      "title": "LightColorMaterial",
+      "type": "object"
+    },
+    "MaterialDependency": {
+      "additionalProperties": false,
+      "properties": {
+        "关联视听记录标识": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z][A-Za-z0-9_.:-]*$",
+            "type": "string"
+          },
+          "title": "关联视听记录标识",
+          "type": "array"
+        },
+        "关联镜头标识": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z][A-Za-z0-9_.:-]*$",
+            "type": "string"
+          },
+          "title": "关联镜头标识",
+          "type": "array"
+        },
+        "原因": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "原因"
+        },
+        "所需素材": {
+          "minLength": 1,
+          "title": "所需素材",
+          "type": "string"
+        },
+        "是否必须使用真实素材": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "是否必须使用真实素材"
+        },
+        "用途": {
+          "minLength": 1,
+          "title": "用途",
+          "type": "string"
+        }
+      },
+      "required": [
+        "关联镜头标识",
+        "关联视听记录标识",
+        "用途",
+        "所需素材",
+        "是否必须使用真实素材",
+        "原因"
+      ],
+      "title": "MaterialDependency",
+      "type": "object"
+    },
+    "MediaReference": {
+      "additionalProperties": false,
+      "properties": {
+        "SHA256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "原片时间秒": {
+          "minimum": 0,
+          "title": "原片时间秒",
+          "type": "number"
+        },
+        "路径": {
+          "minLength": 1,
+          "title": "路径",
+          "type": "string"
+        }
+      },
+      "required": [
+        "路径",
+        "原片时间秒",
+        "SHA256"
+      ],
+      "title": "MediaReference",
+      "type": "object"
+    },
+    "NormalizedRegion": {
+      "additionalProperties": false,
+      "properties": {
+        "height": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Height"
+        },
+        "width": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Width"
+        },
+        "x": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "X"
+        },
+        "y": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Y"
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height"
+      ],
+      "title": "NormalizedRegion",
+      "type": "object"
+    },
+    "ObservedRange": {
+      "additionalProperties": false,
+      "properties": {
+        "已核对内容": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "已核对内容",
+          "type": "array"
+        },
+        "开始秒": {
+          "minimum": 0,
+          "title": "开始秒",
+          "type": "number"
+        },
+        "结束秒": {
+          "minimum": 0,
+          "title": "结束秒",
+          "type": "number"
+        }
+      },
+      "required": [
+        "开始秒",
+        "结束秒",
+        "已核对内容"
+      ],
+      "title": "ObservedRange",
+      "type": "object"
+    },
+    "OpeningEndState": {
+      "additionalProperties": false,
+      "properties": {
+        "人物产品与构图": {
+          "minLength": 1,
+          "title": "人物产品与构图",
+          "type": "string"
+        },
+        "仍在延续的动作标识": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z][A-Za-z0-9_.:-]*$",
+            "type": "string"
+          },
+          "title": "仍在延续的动作标识",
+          "type": "array"
+        },
+        "仍在延续的视听记录标识": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z][A-Za-z0-9_.:-]*$",
+            "type": "string"
+          },
+          "title": "仍在延续的视听记录标识",
+          "type": "array"
+        },
+        "原片时间秒": {
+          "minimum": 0,
+          "title": "原片时间秒",
+          "type": "number"
+        }
+      },
+      "required": [
+        "原片时间秒",
+        "人物产品与构图",
+        "仍在延续的动作标识",
+        "仍在延续的视听记录标识"
+      ],
+      "title": "OpeningEndState",
+      "type": "object"
+    },
+    "OpeningRange": {
+      "additionalProperties": false,
+      "properties": {
+        "完整开场": {
+          "$ref": "#/$defs/CompleteOpening"
+        },
+        "实际前三秒": {
+          "$ref": "#/$defs/ActualFirstThreeSeconds"
+        }
+      },
+      "required": [
+        "实际前三秒",
+        "完整开场"
+      ],
+      "title": "OpeningRange",
+      "type": "object"
+    },
+    "OpeningReferenceUsage": {
+      "additionalProperties": false,
+      "properties": {
+        "不可直接迁移的内容": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "不可直接迁移的内容",
+          "type": "array"
+        },
+        "不改当前口播时的借鉴边界": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "不改当前口播时的借鉴边界"
+        },
+        "可借鉴点": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "可借鉴点",
+          "type": "array"
+        },
+        "对原台词的依赖": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "对原台词的依赖"
+        },
+        "对音乐文字及其他元素的依赖": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "对音乐文字及其他元素的依赖"
+        },
+        "必要依赖": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "必要依赖",
+          "type": "array"
+        },
+        "检索摘要": {
+          "minLength": 1,
+          "title": "检索摘要",
+          "type": "string"
+        },
+        "适用的口播开头与后文": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "适用的口播开头与后文"
+        }
+      },
+      "required": [
+        "可借鉴点",
+        "适用的口播开头与后文",
+        "必要依赖",
+        "对原台词的依赖",
+        "对音乐文字及其他元素的依赖",
+        "不改当前口播时的借鉴边界",
+        "不可直接迁移的内容",
+        "检索摘要"
+      ],
+      "title": "OpeningReferenceUsage",
+      "type": "object"
+    },
+    "OpeningShot": {
+      "additionalProperties": false,
+      "properties": {
+        "与前镜衔接": {
+          "$ref": "#/$defs/Transition"
+        },
+        "主体空间关系": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "主体空间关系"
+        },
+        "人物标识": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z][A-Za-z0-9_.:-]*$",
+            "type": "string"
+          },
+          "title": "人物标识",
+          "type": "array"
+        },
+        "光线色彩与材质表现": {
+          "$ref": "#/$defs/LightColorMaterial"
+        },
+        "关键帧": {
+          "items": {
+            "$ref": "#/$defs/KeyFrame"
+          },
+          "title": "关键帧",
+          "type": "array"
+        },
+        "动作过程": {
+          "$ref": "#/$defs/ActionProcess"
+        },
+        "动态证据片段": {
+          "items": {
+            "$ref": "#/$defs/DynamicEvidence"
+          },
+          "title": "动态证据片段",
+          "type": "array"
+        },
+        "场景标识": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "场景标识"
+        },
+        "对象标识": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z][A-Za-z0-9_.:-]*$",
+            "type": "string"
+          },
+          "title": "对象标识",
+          "type": "array"
+        },
+        "开始秒": {
+          "minimum": 0,
+          "title": "开始秒",
+          "type": "number"
+        },
+        "结束秒": {
+          "minimum": 0,
+          "title": "结束秒",
+          "type": "number"
+        },
+        "镜头标识": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z][A-Za-z0-9_.:-]*$",
+          "title": "镜头标识",
+          "type": "string"
+        },
+        "镜头表现": {
+          "$ref": "#/$defs/ShotPresentation"
+        }
+      },
+      "required": [
+        "开始秒",
+        "结束秒",
+        "镜头标识",
+        "人物标识",
+        "场景标识",
+        "对象标识",
+        "主体空间关系",
+        "动作过程",
+        "镜头表现",
+        "光线色彩与材质表现",
+        "与前镜衔接",
+        "关键帧",
+        "动态证据片段"
+      ],
+      "title": "OpeningShot",
+      "type": "object"
+    },
+    "Overlay": {
+      "additionalProperties": false,
+      "properties": {
+        "变化过程": {
+          "items": {
+            "$ref": "#/$defs/OverlayChange"
+          },
+          "title": "变化过程",
+          "type": "array"
+        },
+        "开始秒": {
+          "minimum": 0,
+          "title": "开始秒",
+          "type": "number"
+        },
+        "文字原文或元素内容": {
+          "minLength": 1,
+          "title": "文字原文或元素内容",
+          "type": "string"
+        },
+        "画面布局": {
+          "$ref": "#/$defs/VisualLayout"
+        },
+        "类型": {
+          "minLength": 1,
+          "title": "类型",
+          "type": "string"
+        },
+        "结束秒": {
+          "minimum": 0,
+          "title": "结束秒",
+          "type": "number"
+        },
+        "视觉样式": {
+          "$ref": "#/$defs/VisualStyle"
+        },
+        "记录标识": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z][A-Za-z0-9_.:-]*$",
+          "title": "记录标识",
+          "type": "string"
+        },
+        "配合关系": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "配合关系"
+        },
+        "配合的口播标识": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z][A-Za-z0-9_.:-]*$",
+            "type": "string"
+          },
+          "title": "配合的口播标识",
+          "type": "array"
+        },
+        "配合的镜头标识": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z][A-Za-z0-9_.:-]*$",
+            "type": "string"
+          },
+          "title": "配合的镜头标识",
+          "type": "array"
+        }
+      },
+      "required": [
+        "开始秒",
+        "结束秒",
+        "记录标识",
+        "类型",
+        "文字原文或元素内容",
+        "画面布局",
+        "视觉样式",
+        "变化过程",
+        "配合的镜头标识",
+        "配合的口播标识",
+        "配合关系"
+      ],
+      "title": "Overlay",
+      "type": "object"
+    },
+    "OverlayChange": {
+      "additionalProperties": false,
+      "properties": {
+        "出现变化或退出表现": {
+          "minLength": 1,
+          "title": "出现变化或退出表现",
+          "type": "string"
+        },
+        "开始秒": {
+          "minimum": 0,
+          "title": "开始秒",
+          "type": "number"
+        },
+        "结束秒": {
+          "minimum": 0,
+          "title": "结束秒",
+          "type": "number"
+        }
+      },
+      "required": [
+        "开始秒",
+        "结束秒",
+        "出现变化或退出表现"
+      ],
+      "title": "OverlayChange",
+      "type": "object"
+    },
+    "PreservationSuggestion": {
+      "additionalProperties": false,
+      "properties": {
+        "关联视听记录标识": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z][A-Za-z0-9_.:-]*$",
+            "type": "string"
+          },
+          "title": "关联视听记录标识",
+          "type": "array"
+        },
+        "关联镜头标识": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z][A-Za-z0-9_.:-]*$",
+            "type": "string"
+          },
+          "title": "关联镜头标识",
+          "type": "array"
+        },
+        "对表达的作用": {
+          "minLength": 1,
+          "title": "对表达的作用",
+          "type": "string"
+        },
+        "建议保留的关系或表现": {
+          "minLength": 1,
+          "title": "建议保留的关系或表现",
+          "type": "string"
+        }
+      },
+      "required": [
+        "关联镜头标识",
+        "关联视听记录标识",
+        "建议保留的关系或表现",
+        "对表达的作用"
+      ],
+      "title": "PreservationSuggestion",
+      "type": "object"
+    },
+    "ProductObject": {
+      "additionalProperties": false,
+      "properties": {
+        "内容作用": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "内容作用"
+        },
+        "可见特征": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "可见特征"
+        },
+        "名称": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "名称"
+        },
+        "对象标识": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z][A-Za-z0-9_.:-]*$",
+          "title": "对象标识",
+          "type": "string"
+        },
+        "类型": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "类型"
+        }
+      },
+      "required": [
+        "对象标识",
+        "名称",
+        "类型",
+        "可见特征",
+        "内容作用"
+      ],
+      "title": "ProductObject",
+      "type": "object"
+    },
+    "ReplacementConstraint": {
+      "additionalProperties": false,
+      "properties": {
+        "实体标识": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z][A-Za-z0-9_.:-]*$",
+          "title": "实体标识",
+          "type": "string"
+        },
+        "替换时需满足的条件": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "替换时需满足的条件",
+          "type": "array"
+        }
+      },
+      "required": [
+        "实体标识",
+        "替换时需满足的条件"
+      ],
+      "title": "ReplacementConstraint",
+      "type": "object"
+    },
+    "ReplicationBasis": {
+      "additionalProperties": false,
+      "properties": {
+        "元素替换约束": {
+          "items": {
+            "$ref": "#/$defs/ReplacementConstraint"
+          },
+          "title": "元素替换约束",
+          "type": "array"
+        },
+        "素材依赖": {
+          "items": {
+            "$ref": "#/$defs/MaterialDependency"
+          },
+          "title": "素材依赖",
+          "type": "array"
+        },
+        "表现保留建议": {
+          "items": {
+            "$ref": "#/$defs/PreservationSuggestion"
+          },
+          "title": "表现保留建议",
+          "type": "array"
+        }
+      },
+      "required": [
+        "表现保留建议",
+        "元素替换约束",
+        "素材依赖"
+      ],
+      "title": "ReplicationBasis",
+      "type": "object"
+    },
+    "Scene": {
+      "additionalProperties": false,
+      "properties": {
+        "名称": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "名称"
+        },
+        "场景标识": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z][A-Za-z0-9_.:-]*$",
+          "title": "场景标识",
+          "type": "string"
+        },
+        "空间与环境特征": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "空间与环境特征"
+        }
+      },
+      "required": [
+        "场景标识",
+        "名称",
+        "空间与环境特征"
+      ],
+      "title": "Scene",
+      "type": "object"
+    },
+    "ShotPresentation": {
+      "additionalProperties": false,
+      "properties": {
+        "景别": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "景别"
+        },
+        "机位角度": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "机位角度"
+        },
+        "画面速度处理": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "画面速度处理"
+        },
+        "相机运动": {
+          "items": {
+            "$ref": "#/$defs/CameraMovement"
+          },
+          "title": "相机运动",
+          "type": "array"
+        },
+        "结束构图": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "结束构图"
+        },
+        "起始构图": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "起始构图"
+        }
+      },
+      "required": [
+        "景别",
+        "机位角度",
+        "起始构图",
+        "结束构图",
+        "相机运动",
+        "画面速度处理"
+      ],
+      "title": "ShotPresentation",
+      "type": "object"
+    },
+    "Sound": {
+      "additionalProperties": false,
+      "properties": {
+        "实际声音": {
+          "minLength": 1,
+          "title": "实际声音",
+          "type": "string"
+        },
+        "开始秒": {
+          "minimum": 0,
+          "title": "开始秒",
+          "type": "number"
+        },
+        "类型": {
+          "minLength": 1,
+          "title": "类型",
+          "type": "string"
+        },
+        "结束秒": {
+          "minimum": 0,
+          "title": "结束秒",
+          "type": "number"
+        },
+        "节奏与相对音量变化": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "节奏与相对音量变化"
+        },
+        "记录标识": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z][A-Za-z0-9_.:-]*$",
+          "title": "记录标识",
+          "type": "string"
+        },
+        "配合关系": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "配合关系"
+        },
+        "配合的口播标识": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z][A-Za-z0-9_.:-]*$",
+            "type": "string"
+          },
+          "title": "配合的口播标识",
+          "type": "array"
+        },
+        "配合的镜头标识": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z][A-Za-z0-9_.:-]*$",
+            "type": "string"
+          },
+          "title": "配合的镜头标识",
+          "type": "array"
+        }
+      },
+      "required": [
+        "开始秒",
+        "结束秒",
+        "记录标识",
+        "类型",
+        "实际声音",
+        "节奏与相对音量变化",
+        "配合的镜头标识",
+        "配合的口播标识",
+        "配合关系"
+      ],
+      "title": "Sound",
+      "type": "object"
+    },
+    "Speech": {
+      "additionalProperties": false,
+      "properties": {
+        "关键字句时间": {
+          "items": {
+            "$ref": "#/$defs/TimedPhrase"
+          },
+          "title": "关键字句时间",
+          "type": "array"
+        },
+        "原文": {
+          "minLength": 1,
+          "title": "原文",
+          "type": "string"
+        },
+        "开始秒": {
+          "minimum": 0,
+          "title": "开始秒",
+          "type": "number"
+        },
+        "结束秒": {
+          "minimum": 0,
+          "title": "结束秒",
+          "type": "number"
+        },
+        "记录标识": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z][A-Za-z0-9_.:-]*$",
+          "title": "记录标识",
+          "type": "string"
+        },
+        "语气语速与停顿": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "语气语速与停顿"
+        },
+        "说话人物标识": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "说话人物标识"
+        },
+        "说话方式": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "说话方式"
+        }
+      },
+      "required": [
+        "开始秒",
+        "结束秒",
+        "记录标识",
+        "说话人物标识",
+        "原文",
+        "说话方式",
+        "语气语速与停顿",
+        "关键字句时间"
+      ],
+      "title": "Speech",
+      "type": "object"
+    },
+    "SyncPoint": {
+      "additionalProperties": false,
+      "properties": {
+        "关联动作标识": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z][A-Za-z0-9_.:-]*$",
+            "type": "string"
+          },
+          "title": "关联动作标识",
+          "type": "array"
+        },
+        "关联视听记录标识": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z][A-Za-z0-9_.:-]*$",
+            "type": "string"
+          },
+          "title": "关联视听记录标识",
+          "type": "array"
+        },
+        "关联镜头标识": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z][A-Za-z0-9_.:-]*$",
+            "type": "string"
+          },
+          "title": "关联镜头标识",
+          "type": "array"
+        },
+        "原片时间秒": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "原片时间秒"
+        },
+        "同步关系": {
+          "minLength": 1,
+          "title": "同步关系",
+          "type": "string"
+        }
+      },
+      "required": [
+        "原片时间秒",
+        "关联镜头标识",
+        "关联动作标识",
+        "关联视听记录标识",
+        "同步关系"
+      ],
+      "title": "SyncPoint",
+      "type": "object"
+    },
+    "TimedPhrase": {
+      "additionalProperties": false,
+      "properties": {
+        "原文片段": {
+          "minLength": 1,
+          "title": "原文片段",
+          "type": "string"
+        },
+        "开始秒": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "开始秒"
+        },
+        "结束秒": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "结束秒"
+        }
+      },
+      "required": [
+        "开始秒",
+        "结束秒",
+        "原文片段"
+      ],
+      "title": "TimedPhrase",
+      "type": "object"
+    },
+    "Transition": {
+      "additionalProperties": false,
+      "properties": {
+        "刻意改变的状态": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "刻意改变的状态",
+          "type": "array"
+        },
+        "前镜标识": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "前镜标识"
+        },
+        "开始秒": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "开始秒"
+        },
+        "方式": {
+          "minLength": 1,
+          "title": "方式",
+          "type": "string"
+        },
+        "结束秒": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "结束秒"
+        },
+        "衔接表现": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "衔接表现"
+        },
+        "需保持的连续状态": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "需保持的连续状态",
+          "type": "array"
+        }
+      },
+      "required": [
+        "前镜标识",
+        "方式",
+        "开始秒",
+        "结束秒",
+        "衔接表现",
+        "需保持的连续状态",
+        "刻意改变的状态"
+      ],
+      "title": "Transition",
+      "type": "object"
+    },
+    "Uncertainty": {
+      "additionalProperties": false,
+      "properties": {
+        "对参考或复刻的影响": {
+          "minLength": 1,
+          "title": "对参考或复刻的影响",
+          "type": "string"
+        },
+        "涉及的模块或记录标识": {
+          "minLength": 1,
+          "title": "涉及的模块或记录标识",
+          "type": "string"
+        },
+        "说明": {
+          "minLength": 1,
+          "title": "说明",
+          "type": "string"
+        },
+        "需补充的证据": {
+          "minLength": 1,
+          "title": "需补充的证据",
+          "type": "string"
+        }
+      },
+      "required": [
+        "涉及的模块或记录标识",
+        "说明",
+        "对参考或复刻的影响",
+        "需补充的证据"
+      ],
+      "title": "Uncertainty",
+      "type": "object"
+    },
+    "VisualLayout": {
+      "additionalProperties": false,
+      "properties": {
+        "位置说明": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "位置说明"
+        },
+        "层级与遮挡关系": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "层级与遮挡关系"
+        },
+        "归一化区域": {
+          "$ref": "#/$defs/NormalizedRegion"
+        }
+      },
+      "required": [
+        "位置说明",
+        "归一化区域",
+        "层级与遮挡关系"
+      ],
+      "title": "VisualLayout",
+      "type": "object"
+    },
+    "VisualStyle": {
+      "additionalProperties": false,
+      "properties": {
+        "大小与强调方式": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "大小与强调方式"
+        },
+        "字体或元素形态": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "字体或元素形态"
+        },
+        "颜色描边与底框": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "颜色描边与底框"
+        }
+      },
+      "required": [
+        "字体或元素形态",
+        "颜色描边与底框",
+        "大小与强调方式"
+      ],
+      "title": "VisualStyle",
+      "type": "object"
+    },
+    "WholeVideoContext": {
+      "additionalProperties": false,
+      "properties": {
+        "产品与主要表达": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "产品与主要表达"
+        },
+        "开场面向的人群与情境": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "开场面向的人群与情境"
+        },
+        "视频主题": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "视频主题"
+        }
+      },
+      "required": [
+        "视频主题",
+        "产品与主要表达",
+        "开场面向的人群与情境"
+      ],
+      "title": "WholeVideoContext",
+      "type": "object"
+    }
+  },
+  "$id": "https://video-scope.local/contracts/1.0.0/opening.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "不确定项": {
+      "items": {
+        "$ref": "#/$defs/Uncertainty"
+      },
+      "title": "不确定项",
+      "type": "array"
+    },
+    "人物场景与产品关系": {
+      "$ref": "#/$defs/Entities"
+    },
+    "后文承接": {
+      "$ref": "#/$defs/FollowUp"
+    },
+    "吸引机制": {
+      "$ref": "#/$defs/AttractionMechanism"
+    },
+    "复刻依据": {
+      "$ref": "#/$defs/ReplicationBasis"
+    },
+    "已观察范围": {
+      "items": {
+        "$ref": "#/$defs/ObservedRange"
+      },
+      "minItems": 1,
+      "title": "已观察范围",
+      "type": "array"
+    },
+    "开场参考用法": {
+      "$ref": "#/$defs/OpeningReferenceUsage"
+    },
+    "开场范围": {
+      "$ref": "#/$defs/OpeningRange"
+    },
+    "开场视听时序": {
+      "$ref": "#/$defs/AudiovisualTimeline"
+    },
+    "开场镜头列表": {
+      "items": {
+        "$ref": "#/$defs/OpeningShot"
+      },
+      "minItems": 1,
+      "title": "开场镜头列表",
+      "type": "array"
+    },
+    "必要的整片上下文": {
+      "$ref": "#/$defs/WholeVideoContext"
+    },
+    "来源视频标识": {
+      "minLength": 1,
+      "title": "来源视频标识",
+      "type": "string"
+    }
+  },
+  "required": [
+    "来源视频标识",
+    "已观察范围",
+    "开场范围",
+    "必要的整片上下文",
+    "人物场景与产品关系",
+    "开场镜头列表",
+    "开场视听时序",
+    "吸引机制",
+    "后文承接",
+    "开场参考用法",
+    "复刻依据",
+    "不确定项"
+  ],
+  "title": "OpeningResult",
+  "type": "object"
+}

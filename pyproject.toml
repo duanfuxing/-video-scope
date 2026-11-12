@@ -8,7 +8,15 @@ version = "0.1.0"
 description = "Independent local video evidence preparation for VideoScope"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
-dependencies = ["pydantic>=2.12,<3", "typer>=0.20,<1"]
+dependencies = [
+    "google-genai>=2.34,<3",
+    "httpx[socks]>=0.28,<1",
+    "numpy>=2,<3",
+    "opencv-python-headless>=4.11,<5",
+    "pydantic>=2.12,<3",
+    "python-dotenv>=1.1,<2",
+    "typer>=0.20,<1",
+]
 
 [project.scripts]
 video-scope = "video_scope.cli:app"
