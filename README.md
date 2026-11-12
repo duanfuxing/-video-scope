@@ -6,7 +6,7 @@
 
 已实现第一阶段的**媒体证据准备**：本地探测、实际帧时间戳、稀疏抽帧、音频提取、SQLite 准备任务、内容哈希复用、显式恢复与证据完整性校验。已接入指定 GitHub 仓库的三个远程 JSON，处理命令运行前先检查更新，下载到独立运行目录并建立跨源去重索引。
 
-已实现限定四样本的 `full` / `opening` 分阶段分析编排、版本化结果契约、证据导出和持久化费用账本，**2 条整片 + 2 条黄金开场的真实拆解已全部完成**。语音、声音和画面文字由同一 Gemini 主模型直接理解；按用户决定，首版不再引入独立 ASR 或第二个语音校验模型。`both` 和通用分析批处理尚未实现。准备成功仍只表示媒体证据已落盘，不代表已观察或理解视频。
+已实现 `full` / `opening` 分阶段分析、`both` 共用基础证据、任意本地单文件入口、严格 JSONL 批处理、版本化结果契约、证据导出和持久化费用账本。限定活动的 **2 条整片 + 2 条黄金开场真实拆解已全部完成**；通用入口及批处理当前完成的是工程测试，尚未借新入口发起新的真实付费验收。语音、声音和画面文字由同一 Gemini 主模型直接理解；按用户决定，首版不再引入独立 ASR 或第二个语音校验模型。准备成功仍只表示媒体证据已落盘，不代表已观察或理解视频。
 
 ## 项目边界
 
@@ -147,9 +147,9 @@ uv run video-scope prepare /路径/视频.mp4 --data-dir ~/VideoScopeData --offl
 | 独立环境、锁文件与运行数据隔离 | 已实现 |
 | 本地媒体准备、哈希校验、准备任务恢复 | 已实现；工程验证见开发计划 |
 | 远程 JSON 更新检查、本地快照与跨源视频去重 | 已实现；不自动下载或分析视频 |
-| 单视频整片分析与正式结果包导出 | 已实现固定四样本范围内的两阶段编排和本地导出 |
-| 黄金开场与两种结果复用 | opening 已实现；both 未实现 |
-| 分析恢复与费用统计 | 已实现持久化步骤、共享预算、未知请求暂停及显式保留审计的重试；通用批处理未实现 |
+| 单视频整片分析与正式结果包导出 | 已实现固定活动与任意本地文件入口；新入口尚未做新增真实付费验收 |
+| 黄金开场与两种结果复用 | opening、full、both 均已实现；both 分别保存两包并复用内容哈希证据 |
+| 分析恢复与费用统计 | 已实现持久化步骤、共享预算、未知请求暂停、显式审计重试及严格 JSONL 批处理 |
 | 语音 / OCR / 切镜候选 | Gemini 直接读取声音与画面文字，不另接 ASR / OCR；OpenCV 候选已实现，不等于真实切点 |
 | 真实视频与模型验收 | 四样本 4 / 4 完成；四包机器校验通过，不把工程夹具计入真实结果 |
 
@@ -178,9 +178,36 @@ opening 2 两阶段估算 $0.04186350 / $0.04956450。full 2 两阶段估算 $0.
 - 四条均已下载、探测、生成完整本地证据；轻量时序指纹与抽帧目视检查未发现明显同内容重复，不作为版权或全库唯一性证明。
 - 两条 full 准备完整原片；两条 opening 各准备连续前 12 秒及密集关键帧，四份输入均保留音轨。媒体 Base64 估计分别约 1.74 / 18.44 / 7.99 / 4.42 MB，真实序列化请求仍由发送前硬检查限制在 20 MB 内。
 - 实际只读价格查询得到输入 $0.75 / 百万 token、输出 $3.75 / 百万 token；不假设缓存折扣，不代表最终账单或模型调用成功。
-- `uv run ruff check .`、`uv run mypy src tests`、diff 格式检查通过；`uv run pytest -q` **125 项通过**。测试覆盖显式放弃审计、严格建连失败分类、终止元数据 Part 兼容、完整流日志无网络恢复及按观察秒预留输入费用。
+- `uv run ruff check .`、`uv run mypy src tests`、diff 格式检查通过；`uv run pytest -q` **146 项通过**。测试覆盖显式放弃审计、严格建连失败分类、终止元数据 Part 兼容、完整流日志无网络恢复、按观察秒预留输入费用，以及通用单文件 / both / 批处理的授权、预算、恢复和失败隔离。
 
-运行数据位于 `~/VideoScopeData`，固定清单、账本和四个结果包在 `campaigns/four-examples-v1/`，各阶段响应保存在 `analyses/`。四样本活动状态为 completed；本轮代码仍未提交或推送。
+运行数据位于 `~/VideoScopeData`，固定清单、账本和四个结果包在 `campaigns/four-examples-v1/`，各阶段响应保存在 `analyses/`。四样本活动状态为 completed；该里程碑代码已由提交 `d59e799` 推送。
+
+## 通用本地分析入口
+
+`analyze-file` 接受任意本地常规文件，不读取或同步固定远程样本。每次都必须显式提供上传授权和共享预算；预算必须大于 0 且不超过 5 美元。它是本地记账与停止条件，不是供应商账户的硬扣费上限，也不是最终账单。
+
+```bash
+uv run video-scope analyze-file /绝对路径/视频.mp4 \
+  --mode both --budget-usd 1 --data-dir ~/VideoScopeData \
+  --allow-upload --stream
+```
+
+`full`、`opening` 各生成一个结果包；`both` 固定先运行 opening、再运行 full，共用一个活动账本和按来源 SHA-256 校验的基础证据缓存，仍分别导出两个结果包。命令输出活动 ID；相同文件、模式和预算重复执行会恢复同一活动，已完成付费阶段按持久化响应或结果包复用。活动预算不可静默修改；确需另开活动时使用 `--run-id <字母数字或连字符>`，这可能产生新的付费调用，不能用于抹掉旧账本或未知费用。
+
+批处理 JSONL 每个非空行只能包含 `source` 和 `mode`；相对路径以清单目录为基准：
+
+```jsonl
+{"source": "./a.mp4", "mode": "both"}
+{"source": "/绝对路径/b.mp4", "mode": "opening"}
+```
+
+```bash
+uv run video-scope analyze-batch /路径/analysis.jsonl \
+  --budget-usd 3 --data-dir ~/VideoScopeData --allow-upload --stream
+uv run video-scope analysis-status <活动ID> --data-dir ~/VideoScopeData
+```
+
+付费批次在供应商预检前解析全部行、解析并哈希全部来源，拒绝重复的同内容同模式；清单上限 1 MB，每批最多四个展开后的分析单元，`both` 计两个，以覆盖每单元最多两次主调用和一次模块修复的 12 次审计上限。普通单元失败会落盘后继续其他单元，命令最终返回非零；出现已发送但结果或费用未知的请求时立即暂停整个活动。`analysis-status` 只读本地进度和账本，不读取密钥或连接供应商。新入口目前仅完成离线 / Mock 工程验证，没有借此新增上传、生成费用或真实结果包。
 
 ## 四样本验收入口
 
@@ -196,7 +223,7 @@ uv run video-scope status --data-dir ~/VideoScopeData
 uv run video-scope validate-package /绝对路径/结果包
 ```
 
-分析入口默认先同步远端；`--offline` 只跳过远端 JSON 更新，**不会禁止已授权的模型联网调用**。已有四样本清单恢复时不重新选样，不因元数据更新替换媒体。需要恢复分析时重跑同一 `analyze` 或 `acceptance`；原 `resume` 仍只恢复媒体准备任务。
+固定活动的 `analyze` / `acceptance` 默认先同步远端；`--offline` 只跳过远端 JSON 更新，**不会禁止已授权的模型联网调用**。通用 `analyze-file` / `analyze-batch` 完全不读取该远端源，因此没有 `--offline`。已有四样本清单恢复时不重新选样，不因元数据更新替换媒体。需要恢复分析时重跑原命令；`resume` 仍只恢复媒体准备任务。
 
 只有用户明确接受一笔未知请求可能仍被供应商计费并授权重新请求时，才可在同一条 `analyze` 命令追加 `--retry-unknown-call <调用ID>`。旧调用会改为 `abandoned` 并保留原预留、错误和请求审计；该操作只是解除本地阻塞，不是供应商核账结论。
 
@@ -212,7 +239,7 @@ uv run video-scope review-package /绝对路径/结果包 > /结果包外/复核
 
 ### 可选原生流式接收
 
-`analyze` 和 `acceptance` 支持显式 `--stream`，默认仍为非流式。使用官方 SDK 的 `generate_content_stream()`，实际路由为 `/v1beta/models/gemini-3.8-flash:streamGenerateContent?alt=sse`，不是 OpenAI 兼容接口。
+`analyze`、`acceptance`、`analyze-file` 和 `analyze-batch` 支持显式 `--stream`，默认仍为非流式。使用官方 SDK 的 `generate_content_stream()`，实际路由为 `/v1beta/models/gemini-3.8-flash:streamGenerateContent?alt=sse`，不是 OpenAI 兼容接口。
 
 ```bash
 uv run video-scope analyze <样本完整SHA256> --data-dir ~/VideoScopeData --allow-upload --stream

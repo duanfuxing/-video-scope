@@ -173,3 +173,42 @@ def read_batch(path: Path) -> list[dict[str, Any]]:
         except (ValueError, TypeError) as exc:
             entries.append({"line": line_number, "error": str(exc)})
     return entries
+
+
+def read_analysis_batch(path: Path) -> list[dict[str, Any]]:
+    """Read a paid-analysis JSONL manifest strictly, before any provider startup."""
+    path = path.expanduser().resolve(strict=True)
+    if not path.is_file():
+        raise ValueError("analysis batch manifest must be a local regular file")
+    if path.stat().st_size > 1_000_000:
+        raise ValueError("analysis batch manifest exceeds the 1 MB safety limit")
+    entries: list[dict[str, Any]] = []
+    for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        if not line.strip():
+            continue
+        try:
+            entry = json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"analysis batch line {line_number} is not valid JSON") from exc
+        if not isinstance(entry, dict) or set(entry) != {"source", "mode"}:
+            raise ValueError(
+                f"analysis batch line {line_number} must contain only "
+                '{"source": "local path", "mode": "full|opening|both"}'
+            )
+        if not isinstance(entry["source"], str) or not entry["source"].strip():
+            raise ValueError(f"analysis batch line {line_number} source must be nonempty")
+        if not isinstance(entry["mode"], str) or entry["mode"] not in {
+            "full",
+            "opening",
+            "both",
+        }:
+            raise ValueError(
+                f"analysis batch line {line_number} mode must be full, opening or both"
+            )
+        source = Path(entry["source"]).expanduser()
+        if not source.is_absolute():
+            source = path.parent / source
+        entries.append({"line": line_number, "source": source, "mode": entry["mode"]})
+    if not entries:
+        raise ValueError("analysis batch contains no entries")
+    return entries

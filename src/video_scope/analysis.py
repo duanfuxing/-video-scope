@@ -1,4 +1,4 @@
-"""Fixed two-stage full/opening analysis, with durable paid-step recovery."""
+"""Two-stage full/opening analysis with durable paid-step recovery."""
 
 import copy
 import hashlib

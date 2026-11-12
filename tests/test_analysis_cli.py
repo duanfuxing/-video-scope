@@ -10,8 +10,10 @@ import pytest
 from typer.testing import CliRunner
 
 import video_scope.cli as cli
+from video_scope.analysis_runs import batch_campaign_id, local_campaign_id, resolve_analysis_batch
 from video_scope.analysis_store import AnalysisStore
-from video_scope.jobs import Store
+from video_scope.evidence import digest
+from video_scope.jobs import Store, read_analysis_batch
 from video_scope.provider import ENDPOINT, MODEL, Pricing, ProviderConfig
 
 
@@ -380,6 +382,555 @@ def test_status_without_task_id_emits_local_campaign_ledger(tmp_path: Path) -> N
     assert payload["campaign_id"] == cli.CAMPAIGN_ID
     assert payload["budget_usd"] == "5"
     assert payload["call_count"] == 0
+
+
+def test_analyze_file_requires_upload_before_reading_source_or_startup(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        cli,
+        "digest",
+        lambda *_args, **_kwargs: pytest.fail("source must not be read without upload consent"),
+    )
+    monkeypatch.setattr(
+        cli,
+        "_provider_preflight",
+        lambda: pytest.fail("provider startup must not run without upload consent"),
+    )
+
+    result = CliRunner().invoke(
+        cli.app,
+        [
+            "analyze-file",
+            str(tmp_path / "missing.mp4"),
+            "--budget-usd",
+            "1",
+            "--data-dir",
+            str(tmp_path / "data"),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "--allow-upload" in result.output
+    assert not (tmp_path / "data").exists()
+
+
+@pytest.mark.parametrize(
+    ("extra", "message"),
+    [
+        (["--mode", "invalid", "--budget-usd", "1"], "full, opening or both"),
+        (["--mode", "full", "--budget-usd", "0"], "finite amount"),
+        (["--mode", "full", "--budget-usd", "5.01"], "finite amount"),
+        (
+            ["--mode", "full", "--budget-usd", "1", "--run-id", "../invalid"],
+            "1-48 letters",
+        ),
+    ],
+)
+def test_analyze_file_rejects_invalid_scope_before_provider_preflight(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    extra: list[str],
+    message: str,
+) -> None:
+    source = tmp_path / "source.mp4"
+    source.write_bytes(b"local video")
+    monkeypatch.setattr(
+        cli,
+        "_provider_preflight",
+        lambda: pytest.fail("invalid local scope must fail before provider startup"),
+    )
+
+    result = CliRunner().invoke(
+        cli.app,
+        [
+            "analyze-file",
+            str(source),
+            *extra,
+            "--data-dir",
+            str(tmp_path / "data"),
+            "--allow-upload",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert message in result.output
+    assert not (tmp_path / "data").exists()
+
+
+def test_analyze_file_both_uses_one_campaign_and_two_modes_without_source_sync(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "source.mp4"
+    source.write_bytes(b"arbitrary local video")
+    source_hash = digest(source)
+    data_dir = tmp_path / "data"
+    monkeypatch.setattr(
+        cli,
+        "sync_sources",
+        lambda *_args, **_kwargs: pytest.fail("local analysis must not sync remote samples"),
+    )
+    monkeypatch.setattr(
+        cli,
+        "_provider_preflight",
+        lambda: (ProviderConfig("secret"), _pricing()),
+    )
+    calls: list[dict[str, Any]] = []
+
+    def analyze(**kwargs: Any) -> dict[str, Any]:
+        calls.append(kwargs)
+        sample = kwargs["sample"]
+        return {
+            "analysis_id": f"analysis-{sample['mode']}",
+            "mode": sample["mode"],
+            "package": f"/unused/{sample['mode']}",
+            "reused": False,
+        }
+
+    monkeypatch.setattr(cli, "analyze_sample", analyze)
+    result = CliRunner().invoke(
+        cli.app,
+        [
+            "analyze-file",
+            str(source),
+            "--mode",
+            "both",
+            "--budget-usd",
+            "1.25",
+            "--data-dir",
+            str(data_dir),
+            "--allow-upload",
+            "--stream",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    campaign_id = local_campaign_id(source_hash, "both")
+    assert [call["sample"]["mode"] for call in calls] == ["opening", "full"]
+    assert {call["campaign_id"] for call in calls} == {campaign_id}
+    assert all(call["sample"]["source_sha256"] == source_hash for call in calls)
+    assert all(call["sample"]["path"] == str(source.resolve()) for call in calls)
+    assert all(call["config"].streaming is True for call in calls)
+    payload = json.loads(result.stdout)
+    assert payload["campaign_id"] == campaign_id
+    assert payload["status"] == "completed"
+    assert payload["completed_count"] == 2
+    assert [record["mode"] for record in payload["completed"]] == ["opening", "full"]
+    assert payload["ledger"]["budget_usd"] == "1.25"
+    campaign_dir = data_dir / "campaigns" / campaign_id
+    manifest = json.loads((campaign_dir / "input.json").read_text(encoding="utf-8"))
+    assert manifest["source_sha256"] == source_hash
+    assert manifest["requested_mode"] == "both"
+    assert manifest["modes"] == ["opening", "full"]
+
+
+def test_analyze_file_failure_keeps_completed_mode_and_offline_status(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "source.mp4"
+    source.write_bytes(b"local video with partial progress")
+    source_hash = digest(source)
+    data_dir = tmp_path / "data"
+    monkeypatch.setattr(
+        cli,
+        "_provider_preflight",
+        lambda: (ProviderConfig("secret"), _pricing()),
+    )
+
+    def analyze(**kwargs: Any) -> dict[str, Any]:
+        mode = kwargs["sample"]["mode"]
+        if mode == "full":
+            raise RuntimeError("supplier stopped")
+        return {
+            "analysis_id": "opening-analysis",
+            "mode": mode,
+            "package": "/unused/opening",
+            "reused": False,
+        }
+
+    monkeypatch.setattr(cli, "analyze_sample", analyze)
+    run = CliRunner().invoke(
+        cli.app,
+        [
+            "analyze-file",
+            str(source),
+            "--mode",
+            "both",
+            "--budget-usd",
+            "1",
+            "--data-dir",
+            str(data_dir),
+            "--allow-upload",
+        ],
+    )
+
+    assert run.exit_code == 1
+    campaign_id = local_campaign_id(source_hash, "both")
+    progress = json.loads(
+        (data_dir / "campaigns" / campaign_id / "progress.json").read_text(encoding="utf-8")
+    )
+    assert progress["status"] == "needs_attention"
+    assert progress["completed_count"] == 1
+    assert progress["completed"][0]["mode"] == "opening"
+    assert progress["last_error"] == "RuntimeError: supplier stopped"
+
+    monkeypatch.setattr(
+        cli,
+        "_provider_preflight",
+        lambda: pytest.fail("analysis-status must be offline"),
+    )
+    status = CliRunner().invoke(
+        cli.app,
+        ["analysis-status", campaign_id, "--data-dir", str(data_dir)],
+    )
+    assert status.exit_code == 0, status.output
+    status_payload = json.loads(status.stdout)
+    assert status_payload["status"] == "needs_attention"
+    assert status_payload["completed_count"] == 1
+    assert status_payload["ledger"]["campaign_id"] == campaign_id
+
+
+def test_analyze_file_cannot_silently_change_existing_budget(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "source.mp4"
+    source.write_bytes(b"same local video")
+    data_dir = tmp_path / "data"
+    preflights = 0
+
+    def preflight() -> tuple[ProviderConfig, Pricing]:
+        nonlocal preflights
+        preflights += 1
+        return ProviderConfig("secret"), _pricing()
+
+    monkeypatch.setattr(cli, "_provider_preflight", preflight)
+    monkeypatch.setattr(
+        cli,
+        "analyze_sample",
+        lambda **kwargs: {
+            "analysis_id": "analysis",
+            "mode": kwargs["sample"]["mode"],
+            "package": "/unused/package",
+            "reused": False,
+        },
+    )
+    runner = CliRunner()
+    common = [
+        "analyze-file",
+        str(source),
+        "--data-dir",
+        str(data_dir),
+        "--allow-upload",
+    ]
+    first = runner.invoke(cli.app, [*common, "--budget-usd", "1"])
+    changed = runner.invoke(cli.app, [*common, "--budget-usd", "2"])
+    separate = runner.invoke(
+        cli.app,
+        [*common, "--budget-usd", "2", "--run-id", "second-run"],
+    )
+
+    assert first.exit_code == 0, first.output
+    assert changed.exit_code == 1
+    assert "cannot be reset" in changed.output
+    assert separate.exit_code == 0, separate.output
+    assert json.loads(separate.stdout)["campaign_id"] == "local-second-run"
+    assert preflights == 2
+
+
+def test_analyze_batch_validates_all_rows_before_provider_or_runtime_creation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "source.mp4"
+    source.write_bytes(b"video")
+    manifest = tmp_path / "batch.jsonl"
+    manifest.write_text(
+        json.dumps({"source": source.name, "mode": "full"})
+        + "\n"
+        + json.dumps({"source": "missing.mp4"})
+        + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        cli,
+        "_provider_preflight",
+        lambda: pytest.fail("a malformed batch must not start provider preflight"),
+    )
+
+    result = CliRunner().invoke(
+        cli.app,
+        [
+            "analyze-batch",
+            str(manifest),
+            "--budget-usd",
+            "2",
+            "--data-dir",
+            str(tmp_path / "data"),
+            "--allow-upload",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "line 2 must contain only" in result.output
+    assert not (tmp_path / "data").exists()
+
+
+def test_analyze_batch_runs_ordered_units_under_one_budget(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    first = tmp_path / "first.mp4"
+    second = tmp_path / "second.mp4"
+    first.write_bytes(b"first video")
+    second.write_bytes(b"second video")
+    manifest = tmp_path / "batch.jsonl"
+    manifest.write_text(
+        json.dumps({"source": first.name, "mode": "both"})
+        + "\n"
+        + json.dumps({"source": second.name, "mode": "opening"})
+        + "\n",
+        encoding="utf-8",
+    )
+    data_dir = tmp_path / "data"
+    monkeypatch.setattr(
+        cli,
+        "sync_sources",
+        lambda *_args, **_kwargs: pytest.fail("analysis batch must not sync remote samples"),
+    )
+    monkeypatch.setattr(
+        cli,
+        "_provider_preflight",
+        lambda: (ProviderConfig("secret"), _pricing()),
+    )
+    calls: list[dict[str, Any]] = []
+
+    def analyze(**kwargs: Any) -> dict[str, Any]:
+        calls.append(kwargs)
+        sample = kwargs["sample"]
+        return {
+            "analysis_id": f"analysis-{len(calls)}",
+            "mode": sample["mode"],
+            "package": f"/unused/{len(calls)}",
+            "reused": False,
+        }
+
+    monkeypatch.setattr(cli, "analyze_sample", analyze)
+    result = CliRunner().invoke(
+        cli.app,
+        [
+            "analyze-batch",
+            str(manifest),
+            "--budget-usd",
+            "2.5",
+            "--data-dir",
+            str(data_dir),
+            "--allow-upload",
+            "--stream",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    items = resolve_analysis_batch(read_analysis_batch(manifest))
+    campaign_id = batch_campaign_id(items)
+    assert [(Path(call["sample"]["path"]), call["sample"]["mode"]) for call in calls] == [
+        (first, "opening"),
+        (first, "full"),
+        (second, "opening"),
+    ]
+    assert {call["campaign_id"] for call in calls} == {campaign_id}
+    assert all(call["config"].streaming is True for call in calls)
+    payload = json.loads(result.stdout)
+    assert payload["campaign_id"] == campaign_id
+    assert payload["status"] == "completed"
+    assert payload["entry_count"] == 2
+    assert payload["completed_count"] == 3
+    assert payload["total"] == 3
+    assert payload["ledger"]["budget_usd"] == "2.5"
+    assert [record["requested_mode"] for record in payload["completed"]] == [
+        "both",
+        "both",
+        "opening",
+    ]
+    saved = json.loads(
+        (data_dir / "campaigns" / campaign_id / "input.json").read_text(encoding="utf-8")
+    )
+    assert saved["kind"] == "local-analysis-batch"
+    assert len(saved["items"]) == 2
+
+
+@pytest.mark.parametrize(
+    "rows",
+    [
+        [
+            {"source": "same.mp4", "mode": "full"},
+            {"source": "same.mp4", "mode": "both"},
+        ],
+        [{"source": f"source-{index}.mp4", "mode": "full"} for index in range(5)],
+    ],
+)
+def test_analyze_batch_rejects_duplicate_or_oversized_work_before_provider(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    rows: list[dict[str, str]],
+) -> None:
+    for row in rows:
+        (tmp_path / row["source"]).write_bytes(row["source"].encode())
+    manifest = tmp_path / "batch.jsonl"
+    manifest.write_text(
+        "".join(json.dumps(row) + "\n" for row in rows),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        cli,
+        "_provider_preflight",
+        lambda: pytest.fail("invalid batch work must fail before provider startup"),
+    )
+
+    result = CliRunner().invoke(
+        cli.app,
+        [
+            "analyze-batch",
+            str(manifest),
+            "--budget-usd",
+            "5",
+            "--data-dir",
+            str(tmp_path / "data"),
+            "--allow-upload",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "duplicates" in result.output or "at most four" in result.output
+    assert not (tmp_path / "data").exists()
+
+
+def test_analyze_batch_continues_after_nonblocking_failure_and_reports_all_units(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    first = tmp_path / "first.mp4"
+    second = tmp_path / "second.mp4"
+    third = tmp_path / "third.mp4"
+    first.write_bytes(b"first")
+    second.write_bytes(b"second")
+    third.write_bytes(b"third")
+    manifest = tmp_path / "batch.jsonl"
+    manifest.write_text(
+        json.dumps({"source": first.name, "mode": "full"})
+        + "\n"
+        + json.dumps({"source": second.name, "mode": "opening"})
+        + "\n"
+        + json.dumps({"source": third.name, "mode": "full"})
+        + "\n",
+        encoding="utf-8",
+    )
+    data_dir = tmp_path / "data"
+    monkeypatch.setattr(
+        cli,
+        "_provider_preflight",
+        lambda: (ProviderConfig("secret"), _pricing()),
+    )
+    attempted: list[str] = []
+
+    def analyze(**kwargs: Any) -> dict[str, Any]:
+        mode = str(kwargs["sample"]["mode"])
+        attempted.append(mode)
+        if len(attempted) == 2:
+            raise RuntimeError("second item failed")
+        return {
+            "analysis_id": "first-analysis",
+            "mode": mode,
+            "package": "/unused/first",
+            "reused": False,
+        }
+
+    monkeypatch.setattr(cli, "analyze_sample", analyze)
+    result = CliRunner().invoke(
+        cli.app,
+        [
+            "analyze-batch",
+            str(manifest),
+            "--budget-usd",
+            "2",
+            "--data-dir",
+            str(data_dir),
+            "--allow-upload",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert attempted == ["full", "opening", "full"]
+    items = resolve_analysis_batch(read_analysis_batch(manifest))
+    campaign_id = batch_campaign_id(items)
+    progress = json.loads(
+        (data_dir / "campaigns" / campaign_id / "progress.json").read_text(encoding="utf-8")
+    )
+    assert progress["status"] == "completed_with_failures"
+    assert progress["completed_count"] == 2
+    assert progress["completed"][0]["line"] == 1
+    assert progress["completed"][1]["line"] == 3
+    assert progress["failure_count"] == 1
+    assert progress["failures"][0]["line"] == 2
+    assert progress["failures"][0]["blocking"] is False
+    assert progress["failures"][0]["error"] == "RuntimeError: second item failed"
+
+
+def test_analyze_batch_stops_after_unknown_paid_request(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sources = [tmp_path / f"source-{index}.mp4" for index in range(3)]
+    for index, source in enumerate(sources):
+        source.write_bytes(f"video-{index}".encode())
+    manifest = tmp_path / "batch.jsonl"
+    manifest.write_text(
+        "".join(json.dumps({"source": source.name, "mode": "full"}) + "\n" for source in sources),
+        encoding="utf-8",
+    )
+    data_dir = tmp_path / "data"
+    monkeypatch.setattr(
+        cli,
+        "_provider_preflight",
+        lambda: (ProviderConfig("secret"), _pricing()),
+    )
+    attempts = 0
+
+    def analyze(**kwargs: Any) -> dict[str, Any]:
+        nonlocal attempts
+        attempts += 1
+        ledger = kwargs["ledger"]
+        sample = kwargs["sample"]
+        analysis_id = ledger.analysis(
+            kwargs["campaign_id"], "unknown-analysis", sample["mode"], sample["source_sha256"]
+        )
+        reserved = ledger.reserve(
+            analysis_id,
+            "visual",
+            "f" * 64,
+            Decimal("0.01"),
+        )
+        ledger.sending(reserved["id"])
+        ledger.unknown(reserved["id"], "read timed out after dispatch")
+        raise RuntimeError("supplier outcome is unknown")
+
+    monkeypatch.setattr(cli, "analyze_sample", analyze)
+    result = CliRunner().invoke(
+        cli.app,
+        [
+            "analyze-batch",
+            str(manifest),
+            "--budget-usd",
+            "2",
+            "--data-dir",
+            str(data_dir),
+            "--allow-upload",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert attempts == 1
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "needs_attention"
+    assert payload["completed_count"] == 0
+    assert payload["failure_count"] == 1
+    assert payload["failures"][0]["blocking"] is True
+    assert payload["ledger"]["unknown_calls"] == 1
 
 
 def test_validate_package_command_is_offline(

@@ -45,7 +45,7 @@ class ProviderConfig:
             raise ValueError("GEMINI_API_KEY is not configured in this project's environment")
         if model != MODEL or endpoint != ENDPOINT:
             raise ValueError(
-                "model or endpoint differs from the authorized acceptance configuration"
+                "model or endpoint differs from the authorized fixed analysis configuration"
             )
         if urlsplit(endpoint).scheme != "https":
             raise ValueError("supplier endpoint must use HTTPS")

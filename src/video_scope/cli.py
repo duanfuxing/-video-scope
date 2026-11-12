@@ -10,10 +10,22 @@ from typing import Annotated, Any
 import typer
 
 from video_scope.analysis import analyze_sample
+from video_scope.analysis_runs import (
+    analysis_modes,
+    batch_campaign_id,
+    batch_units,
+    batch_unknown_source,
+    ensure_batch_input,
+    ensure_local_input,
+    local_campaign_id,
+    resolve_analysis_batch,
+    save_batch_progress,
+    save_local_progress,
+)
 from video_scope.analysis_store import AnalysisStore, atomic_json
-from video_scope.evidence import validate_evidence
+from video_scope.evidence import digest, validate_evidence
 from video_scope.export import validate_package
-from video_scope.jobs import Store, export_evidence, read_batch
+from video_scope.jobs import Store, export_evidence, read_analysis_batch, read_batch
 from video_scope.provider import ENDPOINT, MODEL, Pricing, ProviderConfig, fetch_pricing
 from video_scope.remote import sync_sources
 from video_scope.review import review_package
@@ -36,7 +48,21 @@ Stream = Annotated[
 ]
 AllowUpload = Annotated[
     bool,
-    typer.Option("--allow-upload", help="明确授权将四样本之一上传给固定供应商并产生费用"),
+    typer.Option("--allow-upload", help="明确授权将所选视频上传给固定供应商并产生费用"),
+]
+BudgetUsd = Annotated[
+    Decimal,
+    typer.Option(
+        "--budget-usd",
+        help="本次活动共享的最高本地记账额度（美元，必须显式提供且大于 0、不超过 5）",
+    ),
+]
+RunId = Annotated[
+    str | None,
+    typer.Option(
+        "--run-id",
+        help="可选的新活动标识；用于在不改写旧预算/账本的前提下显式另开一次运行",
+    ),
 ]
 
 
@@ -62,6 +88,11 @@ def fail(exc: Exception) -> None:
 def _require_upload(allow_upload: bool) -> None:
     if not allow_upload:
         raise ValueError("supplier upload and paid analysis require explicit --allow-upload")
+
+
+def _validate_budget(budget: Decimal) -> None:
+    if not budget.is_finite() or not Decimal("0") < budget <= Decimal("5"):
+        raise ValueError("--budget-usd must be a finite amount in (0, 5]")
 
 
 def _ordered_samples(samples: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -303,6 +334,267 @@ def analyze_command(
         emit(record)
     except (OSError, ValueError, RuntimeError) as exc:
         _save_failure_progress(ledger, campaign_dir, completed, samples, exc)
+        fail(exc)
+
+
+@app.command("analyze-file")
+def analyze_file_command(
+    source: Path,
+    budget_usd: BudgetUsd,
+    mode: Annotated[
+        str,
+        typer.Option("--mode", help="拆解模式：full、opening 或 both"),
+    ] = "full",
+    data_dir: DataDir = DEFAULT_DATA,
+    allow_upload: AllowUpload = False,
+    stream: Stream = False,
+    run_id: RunId = None,
+    retry_unknown_call: Annotated[
+        str | None,
+        typer.Option(
+            "--retry-unknown-call",
+            help="保留指定未知请求为 abandoned 审计记录，并明确授权同来源重新请求",
+        ),
+    ] = None,
+) -> None:
+    """拆解一个任意本地视频；不读取或同步固定远程样本。"""
+    ledger: AnalysisStore | None = None
+    campaign_dir: Path | None = None
+    campaign_id: str | None = None
+    source_hash: str | None = None
+    requested_modes: list[str] = []
+    completed: list[dict[str, Any]] = []
+    input_ready = False
+    try:
+        _require_upload(allow_upload)
+        requested_modes = analysis_modes(mode)
+        _validate_budget(budget_usd)
+        source = source.expanduser().resolve(strict=True)
+        if not source.is_file():
+            raise ValueError("input must be a local regular file")
+        source_hash = digest(source)
+        campaign_id = local_campaign_id(source_hash, mode, run_id)
+        store = Store(data_dir)
+        ledger = AnalysisStore(store)
+        campaign_dir = ledger.campaign(campaign_id, budget_usd, MODEL, ENDPOINT)
+        ensure_local_input(
+            campaign_dir,
+            campaign_id=campaign_id,
+            source=source,
+            source_hash=source_hash,
+            requested_mode=mode,
+            modes=requested_modes,
+        )
+        input_ready = True
+        config, pricing = _provider_preflight()
+        config = replace(config, streaming=stream)
+        if retry_unknown_call is not None:
+            ledger.abandon_unknown(
+                retry_unknown_call,
+                source_hash=source_hash,
+                reason=(
+                    "user explicitly authorized forgetting the unresolved billing outcome "
+                    "and retrying this local source"
+                ),
+            )
+        report: dict[str, Any] | None = None
+        for selected_mode in requested_modes:
+            sample = {
+                "mode": selected_mode,
+                "identity": f"local:{source_hash}",
+                "source_sha256": source_hash,
+                "path": str(source),
+            }
+            result = analyze_sample(
+                ledger=ledger,
+                campaign_id=campaign_id,
+                sample=sample,
+                config=config,
+                pricing=pricing,
+            )
+            completed.append(_analysis_record(sample, result))
+            report = save_local_progress(
+                ledger,
+                campaign_dir,
+                campaign_id=campaign_id,
+                source_hash=source_hash,
+                requested_mode=mode,
+                modes=requested_modes,
+                completed=completed,
+            )
+        assert report is not None
+        emit(report)
+    except (OSError, ValueError, RuntimeError) as exc:
+        if (
+            ledger is not None
+            and campaign_dir is not None
+            and campaign_id is not None
+            and source_hash is not None
+            and requested_modes
+            and input_ready
+        ):
+            try:
+                save_local_progress(
+                    ledger,
+                    campaign_dir,
+                    campaign_id=campaign_id,
+                    source_hash=source_hash,
+                    requested_mode=mode,
+                    modes=requested_modes,
+                    completed=completed,
+                    error=exc,
+                )
+            except (OSError, ValueError):
+                pass
+        fail(exc)
+
+
+@app.command("analyze-batch")
+def analyze_batch_command(
+    manifest: Path,
+    budget_usd: BudgetUsd,
+    data_dir: DataDir = DEFAULT_DATA,
+    allow_upload: AllowUpload = False,
+    stream: Stream = False,
+    run_id: RunId = None,
+    retry_unknown_call: Annotated[
+        str | None,
+        typer.Option(
+            "--retry-unknown-call",
+            help="保留本批次指定未知请求为 abandoned 审计记录，并明确授权重新请求",
+        ),
+    ] = None,
+) -> None:
+    """按严格 JSONL 清单顺序拆解本地视频，共享一个显式预算。"""
+    ledger: AnalysisStore | None = None
+    campaign_dir: Path | None = None
+    campaign_id: str | None = None
+    items: list[dict[str, Any]] = []
+    completed: list[dict[str, Any]] = []
+    failures: list[dict[str, Any]] = []
+    input_ready = False
+    exit_with_failures = False
+    try:
+        _require_upload(allow_upload)
+        _validate_budget(budget_usd)
+        manifest = manifest.expanduser().resolve(strict=True)
+        items = resolve_analysis_batch(read_analysis_batch(manifest))
+        campaign_id = batch_campaign_id(items, run_id)
+        store = Store(data_dir)
+        ledger = AnalysisStore(store)
+        campaign_dir = ledger.campaign(campaign_id, budget_usd, MODEL, ENDPOINT)
+        ensure_batch_input(
+            campaign_dir,
+            campaign_id=campaign_id,
+            manifest=manifest,
+            items=items,
+        )
+        input_ready = True
+        config, pricing = _provider_preflight()
+        config = replace(config, streaming=stream)
+        if retry_unknown_call is not None:
+            retry_source_hash = batch_unknown_source(ledger, retry_unknown_call, campaign_id, items)
+            ledger.abandon_unknown(
+                retry_unknown_call,
+                source_hash=retry_source_hash,
+                reason=(
+                    "user explicitly authorized forgetting the unresolved billing outcome "
+                    "and retrying this local analysis batch"
+                ),
+            )
+        report: dict[str, Any] | None = None
+        for item, selected_mode in batch_units(items):
+            sample = {
+                "mode": selected_mode,
+                "identity": f"batch:{item['item_id']}",
+                "source_sha256": item["source_sha256"],
+                "path": str(item["source"]),
+            }
+            try:
+                result = analyze_sample(
+                    ledger=ledger,
+                    campaign_id=campaign_id,
+                    sample=sample,
+                    config=config,
+                    pricing=pricing,
+                )
+                completed.append(
+                    {
+                        "item_id": item["item_id"],
+                        "line": item["line"],
+                        "requested_mode": item["requested_mode"],
+                        **_analysis_record(sample, result),
+                    }
+                )
+            except (OSError, ValueError, RuntimeError) as exc:
+                blocking = ledger.summary(campaign_id)["unknown_calls"] > 0
+                failures.append(
+                    {
+                        "item_id": item["item_id"],
+                        "line": item["line"],
+                        "requested_mode": item["requested_mode"],
+                        "source_sha256": item["source_sha256"],
+                        "mode": selected_mode,
+                        "blocking": blocking,
+                        "error": f"{type(exc).__name__}: {exc}"[:2000],
+                    }
+                )
+            report = save_batch_progress(
+                ledger,
+                campaign_dir,
+                campaign_id=campaign_id,
+                items=items,
+                completed=completed,
+                failures=failures,
+            )
+            if failures and failures[-1]["blocking"] is True:
+                break
+        assert report is not None
+        emit(report)
+        exit_with_failures = report["status"] != "completed"
+    except (OSError, ValueError, RuntimeError) as exc:
+        if (
+            ledger is not None
+            and campaign_dir is not None
+            and campaign_id is not None
+            and items
+            and input_ready
+        ):
+            try:
+                save_batch_progress(
+                    ledger,
+                    campaign_dir,
+                    campaign_id=campaign_id,
+                    items=items,
+                    completed=completed,
+                    failures=failures,
+                    error=exc,
+                )
+            except (OSError, ValueError):
+                pass
+        fail(exc)
+    if exit_with_failures:
+        raise typer.Exit(1)
+
+
+@app.command("analysis-status")
+def analysis_status_command(campaign_id: str, data_dir: DataDir = DEFAULT_DATA) -> None:
+    """离线读取任一分析活动的进度与费用账本。"""
+    try:
+        if not campaign_id.replace("-", "").isalnum():
+            raise ValueError("campaign id must contain only letters, digits and hyphens")
+        ledger = AnalysisStore(Store(data_dir))
+        summary = ledger.summary(campaign_id)
+        progress_path = ledger.root / "campaigns" / campaign_id / "progress.json"
+        if progress_path.is_file():
+            progress = json.loads(progress_path.read_text(encoding="utf-8"))
+            if not isinstance(progress, dict) or progress.get("campaign_id") != campaign_id:
+                raise ValueError("analysis progress report does not match the campaign")
+            progress["ledger"] = summary
+            emit(progress)
+        else:
+            emit(summary)
+    except (OSError, ValueError) as exc:
         fail(exc)
 
 

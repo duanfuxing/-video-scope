@@ -8,7 +8,7 @@ from typer.testing import CliRunner
 
 from video_scope.cli import app
 from video_scope.evidence import validate_evidence
-from video_scope.jobs import Store, export_evidence, read_batch
+from video_scope.jobs import Store, export_evidence, read_analysis_batch, read_batch
 
 
 @pytest.fixture
@@ -118,6 +118,42 @@ def test_batch_isolates_bad_rows(
     )
     assert result.exit_code == 1
     assert '"state": "prepared"' in result.stdout
+
+
+def test_analysis_batch_is_strict_and_resolves_relative_sources(tmp_path: Path) -> None:
+    source = tmp_path / "source.mp4"
+    source.write_bytes(b"video")
+    manifest = tmp_path / "analysis.jsonl"
+    manifest.write_text(
+        "\n" + json.dumps({"source": source.name, "mode": "both"}) + "\n",
+        encoding="utf-8",
+    )
+
+    entries = read_analysis_batch(manifest)
+
+    assert entries == [{"line": 2, "source": source, "mode": "both"}]
+
+
+@pytest.mark.parametrize(
+    ("payload", "message"),
+    [
+        ("not json\n", "line 1 is not valid JSON"),
+        (json.dumps({"source": "a.mp4"}) + "\n", "must contain only"),
+        (
+            json.dumps({"source": "a.mp4", "mode": "full", "extra": True}) + "\n",
+            "must contain only",
+        ),
+        (json.dumps({"source": "a.mp4", "mode": "invalid"}) + "\n", "mode must be"),
+        (json.dumps({"source": "a.mp4", "mode": ["full"]}) + "\n", "mode must be"),
+        (json.dumps({"source": 123, "mode": "full"}) + "\n", "source must be"),
+    ],
+)
+def test_analysis_batch_rejects_malformed_rows(tmp_path: Path, payload: str, message: str) -> None:
+    manifest = tmp_path / "analysis.jsonl"
+    manifest.write_text(payload, encoding="utf-8")
+
+    with pytest.raises(ValueError, match=message):
+        read_analysis_batch(manifest)
 
 
 def test_code_directory_rejected(tmp_path: Path) -> None:
